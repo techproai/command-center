@@ -11,3 +11,5 @@ __pycache__/
 runtime/.venv/
 web/prisma/dev.db
 web/prisma/dev.db-journal
+desktop/app/
+desktop/dist/

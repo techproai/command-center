@@ -2,18 +2,62 @@
   "name": "command-center",
   "private": true,
   "version": "0.1.0",
+  "main": "desktop/main.cjs",
   "workspaces": [
     "web",
     "packages/contracts"
   ],
   "scripts": {
     "dev:web": "npm --prefix web run dev",
+    "dev:desktop": "concurrently -k \"npm run dev:web\" \"wait-on tcp:3000 && electron .\"",
     "build:web": "npm --prefix web run build",
+    "build:desktop:web": "cross-env NEXT_STANDALONE=true npm run build --prefix web",
+    "prepare:desktop": "npm run build:desktop:web && node desktop/scripts/prepare.cjs",
+    "dist:desktop": "npm run prepare:desktop && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
+    "dist:desktop:dir": "npm run prepare:desktop && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --dir",
     "lint:web": "npm --prefix web run lint",
     "db:generate": "npm --prefix web run db:generate",
     "db:push": "npm --prefix web run db:push",
     "dev:runtime": "uvicorn app.main:app --reload --app-dir runtime --host 127.0.0.1 --port 8010",
     "dev:worker": "celery -A app.celery_app.celery_app worker --workdir runtime --loglevel=info --pool=solo --concurrency=1",
     "test:runtime": "pytest runtime/tests"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^37.4.0",
+    "electron-builder": "^26.0.12",
+    "wait-on": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.techproai.commandcenter",
+    "productName": "Command Center",
+    "directories": {
+      "output": "desktop/dist"
+    },
+    "files": [
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "desktop/app/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Command-Center-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }

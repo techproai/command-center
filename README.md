@@ -56,6 +56,24 @@ npm run dev:worker
 
 Runtime orchestration uses Redis + Celery. Keep `docker compose up redis` running for queue/worker execution.
 
+## Windows Desktop App
+
+### Run as desktop app during development
+
+```powershell
+npm install
+npm run dev:desktop
+```
+
+### Build Windows installer (NSIS)
+
+```powershell
+npm install
+npm run dist:desktop
+```
+
+Installer output is written to `desktop/dist`.
+
 ## Design Principles
 
 - Policy-gated autonomy with auditable decisions.
