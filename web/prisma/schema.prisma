@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  owner
+  admin
+  operator
+  analyst
+  viewer
+}
+
+enum AgentKind {
+  browser
+  linkedin
+  webhook
+}
+
+enum DeploymentStatus {
+  draft
+  active
+  archived
+}
+
+enum RunStatus {
+  queued
+  running
+  waiting_approval
+  succeeded
+  failed
+  cancelled
+}
+
+enum TaskStatus {
+  queued
+  running
+  succeeded
+  failed
+  skipped
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  users       User[]
+  policies    Policy[]
+  agents      Agent[]
+  deployments Deployment[]
+  runs        Run[]
+  templates   AgentTemplate[]
+  webhooks    WebhookTrigger[]
+  audits      AuditEvent[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String    @unique
+  name        String
+  role        UserRole  @default(owner)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Policy {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  name                String
+  description         String
+  maxActionsPerHour   Int       @default(20)
+  maxLinkedinMessages Int       @default(30)
+  requireApprovalTier Int       @default(3)
+  quietHoursEnabled   Boolean   @default(true)
+  quietHoursStart     Int       @default(21)
+  quietHoursEnd       Int       @default(7)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents              Agent[]
+
+  @@index([workspaceId])
+  @@unique([workspaceId, name], name: "workspaceId_name")
+}
+
+model AgentTemplate {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  kind        AgentKind
+  description String
+  defaults    Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents      Agent[]
+
+  @@index([workspaceId])
+  @@index([kind])
+  @@unique([workspaceId, name], name: "workspaceId_name")
+}
+
+model Agent {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  policyId      String
+  templateId    String?
+  name          String
+  kind          AgentKind
+  config        Json
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policy        Policy       @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  template      AgentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  deployments   Deployment[]
+  runs          Run[]
+  webhookTriggers WebhookTrigger[]
+
+  @@index([workspaceId])
+  @@index([policyId])
+  @@index([templateId])
+}
+
+model Deployment {
+  id            String           @id @default(cuid())
+  workspaceId   String
+  agentId       String
+  version       Int
+  status        DeploymentStatus @default(draft)
+  snapshot      Json
+  createdBy     String
+  createdAt     DateTime         @default(now())
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent         Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  runs          Run[]
+
+  @@unique([agentId, version])
+  @@index([workspaceId])
+}
+
+model Run {
+  id            String      @id @default(cuid())
+  workspaceId   String
+  agentId       String
+  deploymentId  String
+  status        RunStatus   @default(queued)
+  input         Json
+  output        Json?
+  failureReason String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent         Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  deployment    Deployment  @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+  tasks         Task[]
+  approvals     ApprovalRequest[]
+
+  @@index([workspaceId])
+  @@index([agentId])
+  @@index([deploymentId])
+  @@index([status])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  runId       String
+  name        String
+  status      TaskStatus @default(queued)
+  attempt     Int        @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  output      Json?
+  error       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  run         Run        @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([status])
+}
+
+model ApprovalRequest {
+  id          String         @id @default(cuid())
+  runId       String
+  action      String
+  reason      String
+  payload     Json
+  status      ApprovalStatus @default(pending)
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  run         Run            @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([status])
+}
+
+model WebhookTrigger {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  secret      String
+  agentId     String
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([agentId])
+}
+
+model AuditEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actor       String
+  action      String
+  targetType  String
+  targetId    String
+  detail      Json
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([targetType, targetId])
+}
+

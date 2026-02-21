@@ -1,0 +1,18 @@
+{
+  "name": "command-center",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "web",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "dev:web": "npm --prefix web run dev",
+    "build:web": "npm --prefix web run build",
+    "lint:web": "npm --prefix web run lint",
+    "db:generate": "npm --prefix web run db:generate",
+    "db:push": "npm --prefix web run db:push",
+    "dev:runtime": "uvicorn app.main:app --reload --app-dir runtime --host 127.0.0.1 --port 8010",
+    "test:runtime": "pytest runtime/tests"
+  }
+}
