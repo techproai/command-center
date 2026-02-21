@@ -2,7 +2,9 @@ import { z } from "zod";
 import { recordAudit } from "@/lib/audit";
 import { fail, ok } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
-import { completeRun, failRun } from "@/lib/run-executor";
+import { enqueueRuntimeRun } from "@/lib/runtime-client";
+import { failRun } from "@/lib/run-executor";
+import { syncRunWithRuntime } from "@/lib/run-sync";
 import { getWorkspaceId } from "@/lib/workspace";
 
 const decisionSchema = z.object({
@@ -12,13 +14,38 @@ const decisionSchema = z.object({
 
 type Params = { params: Promise<{ id: string }> };
 
+function mapRuntimeStateToRunStatus(runtimeState: string) {
+  switch (runtimeState) {
+    case "PENDING":
+    case "RECEIVED":
+      return "queued" as const;
+    case "STARTED":
+    case "RETRY":
+      return "running" as const;
+    case "SUCCESS":
+      return "succeeded" as const;
+    case "FAILURE":
+      return "failed" as const;
+    case "REVOKED":
+      return "cancelled" as const;
+    default:
+      return "queued" as const;
+  }
+}
+
 export async function POST(req: Request, { params }: Params) {
   const workspaceId = await getWorkspaceId();
   const { id } = await params;
 
   const approval = await prisma.approvalRequest.findFirst({
     where: { id, run: { workspaceId } },
-    include: { run: { include: { agent: true } } },
+    include: {
+      run: {
+        include: {
+          agent: true,
+        },
+      },
+    },
   });
 
   if (!approval) {
@@ -50,12 +77,56 @@ export async function POST(req: Request, { params }: Params) {
   });
 
   if (parsed.data.decision === "approved") {
-    await completeRun(approval.runId, {
-      summary: "Run continued after approval.",
-      approvedAction: approval.action,
-    });
+    const agentConfig = approval.run.agent.config as Record<string, unknown>;
+    const objective =
+      typeof agentConfig.objective === "string"
+        ? agentConfig.objective
+        : "Execute approved action with policy controls";
+    const tools = Array.isArray(agentConfig.tools)
+      ? agentConfig.tools.filter((item): item is string => typeof item === "string")
+      : [approval.run.agent.kind, "webhook"];
+
+    try {
+      const runtime = await enqueueRuntimeRun({
+        run_id: approval.runId,
+        agent_kind: approval.run.agent.kind,
+        objective,
+        tools,
+        input: (approval.run.input as Record<string, unknown>) ?? {},
+        max_retries: Number(agentConfig.maxRetries ?? 3),
+      });
+
+      await prisma.run.update({
+        where: { id: approval.runId },
+        data: {
+          status: mapRuntimeStateToRunStatus(runtime.state),
+          runtimeJobId: runtime.job_id,
+          runtimeState: runtime.state,
+        },
+      });
+
+      await prisma.task.updateMany({
+        where: { runId: approval.runId, name: "execute_primary_action", status: "queued" },
+        data: {
+          status: "running",
+          startedAt: new Date(),
+        },
+      });
+
+      await syncRunWithRuntime(approval.runId);
+    } catch {
+      await failRun(approval.runId, "Runtime orchestrator is unavailable after approval.");
+      await prisma.run.update({
+        where: { id: approval.runId },
+        data: { runtimeState: "DISPATCH_FAILED" },
+      });
+    }
   } else {
     await failRun(approval.runId, "Approval rejected by operator.");
+    await prisma.run.update({
+      where: { id: approval.runId },
+      data: { runtimeState: "REJECTED" },
+    });
   }
 
   await recordAudit({
@@ -69,4 +140,3 @@ export async function POST(req: Request, { params }: Params) {
 
   return ok(next);
 }
-

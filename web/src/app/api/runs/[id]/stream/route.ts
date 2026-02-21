@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { syncRunWithRuntime } from "@/lib/run-sync";
 import { getWorkspaceId } from "@/lib/workspace";
 
 type Params = { params: Promise<{ id: string }> };
@@ -6,6 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_: Request, { params }: Params) {
   const workspaceId = await getWorkspaceId();
   const { id } = await params;
+  await syncRunWithRuntime(id);
 
   const run = await prisma.run.findFirst({
     where: { id, workspaceId },

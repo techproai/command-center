@@ -3,7 +3,7 @@
 ## Planes
 
 - Control plane (`web`): GUI, API, auth, persistence, policy and approval coordination.
-- Runtime plane (`runtime`): execution worker endpoints and policy-aware task execution contracts.
+- Runtime plane (`runtime`): FastAPI orchestration endpoints plus Celery workers for async execution, retries, and dead-letter handling.
 
 ## Data
 
@@ -14,4 +14,6 @@
 
 - `execute_task(run_id, task_id, context, tool_bindings, policy_context)`
 - `evaluate(action, context) -> allow | require_approval | deny`
+- `orchestrate(run_id, objective, tools, input) -> job_id`
+- `jobs/{job_id} -> state/result`
 

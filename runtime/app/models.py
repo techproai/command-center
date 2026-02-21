@@ -43,3 +43,34 @@ class ExecuteTaskResponse(BaseModel):
     status: str
     output: dict[str, Any] = Field(default_factory=dict)
 
+
+class OrchestrateRunRequest(BaseModel):
+    run_id: str
+    agent_kind: str
+    objective: str
+    tools: list[str] = Field(default_factory=list)
+    input: dict[str, Any] = Field(default_factory=dict)
+    max_retries: int = Field(default=3, ge=0, le=10)
+    simulate_seconds: float = Field(default=0.8, ge=0, le=3)
+    force_retry: bool = False
+    force_fail: bool = False
+
+
+class OrchestrateRunResponse(BaseModel):
+    job_id: str
+    state: str
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    state: str
+    ready: bool
+    successful: bool
+    failed: bool
+    result: dict[str, Any] | None = None
+    error: str | None = None
+
+
+class CancelJobResponse(BaseModel):
+    job_id: str
+    revoked: bool

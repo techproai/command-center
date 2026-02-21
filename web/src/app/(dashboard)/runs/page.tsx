@@ -19,6 +19,7 @@ export default async function RunsPage() {
               <th className="px-4 py-3">Run</th>
               <th className="px-4 py-3">Agent</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Runtime</th>
               <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -42,6 +43,9 @@ export default async function RunsPage() {
                     }
                   />
                 </td>
+                <td className="px-4 py-3">
+                  <Badge label={run.runtimeState ?? "n/a"} tone="neutral" />
+                </td>
                 <td className="px-4 py-3">{new Date(run.createdAt).toLocaleString()}</td>
                 <td className="px-4 py-3">
                   <CancelRunButton runId={run.id} disabled={["succeeded", "failed", "cancelled"].includes(run.status)} />
@@ -50,7 +54,7 @@ export default async function RunsPage() {
             ))}
             {snapshot.runs.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-sm text-slate-500" colSpan={5}>
+                <td className="px-4 py-8 text-sm text-slate-500" colSpan={6}>
                   No runs yet.
                 </td>
               </tr>

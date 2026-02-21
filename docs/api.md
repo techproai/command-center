@@ -29,3 +29,9 @@
 ## Webhooks
 
 - `POST /api/webhooks/:triggerId`
+
+## Runtime Service (Python)
+
+- `POST /orchestrate`
+- `GET /jobs/:jobId`
+- `POST /jobs/:jobId/cancel`

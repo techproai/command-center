@@ -38,14 +38,23 @@ npm run db:push --prefix web
 npm run dev --prefix web
 ```
 
-### 5. Run runtime service (optional)
+### 5. Start Redis (required for async runtime orchestration)
+
+```powershell
+docker compose up redis -d
+```
+
+### 6. Run runtime services (optional but recommended)
 
 ```powershell
 python -m venv runtime/.venv
 runtime/.venv/Scripts/Activate.ps1
 pip install -r runtime/requirements.txt
 npm run dev:runtime
+npm run dev:worker
 ```
+
+Runtime orchestration uses Redis + Celery. Keep `docker compose up redis` running for queue/worker execution.
 
 ## Design Principles
 

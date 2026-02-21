@@ -160,6 +160,8 @@ model Run {
   workspaceId   String
   agentId       String
   deploymentId  String
+  runtimeJobId  String?     @unique
+  runtimeState  String?
   status        RunStatus   @default(queued)
   input         Json
   output        Json?

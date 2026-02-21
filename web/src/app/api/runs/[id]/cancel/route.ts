@@ -1,6 +1,7 @@
 import { recordAudit } from "@/lib/audit";
 import { fail, ok } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { cancelRuntimeJob } from "@/lib/runtime-client";
 import { getWorkspaceId } from "@/lib/workspace";
 
 type Params = { params: Promise<{ id: string }> };
@@ -21,6 +22,14 @@ export async function POST(_: Request, { params }: Params) {
     return fail(`Run already ${run.status}`, 409);
   }
 
+  if (run.runtimeJobId) {
+    try {
+      await cancelRuntimeJob(run.runtimeJobId);
+    } catch {
+      // cancellation still proceeds in control plane
+    }
+  }
+
   await prisma.task.updateMany({
     where: { runId: id, status: { in: ["queued", "running"] } },
     data: {
@@ -34,6 +43,7 @@ export async function POST(_: Request, { params }: Params) {
     where: { id },
     data: {
       status: "cancelled",
+      runtimeState: "REVOKED",
       failureReason: "Cancelled by operator",
       finishedAt: new Date(),
     },

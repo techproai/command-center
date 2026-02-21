@@ -2,12 +2,14 @@ import Link from "next/link";
 import { Badge } from "@/components/badge";
 import { CancelRunButton } from "@/components/cancel-run-button";
 import { prisma } from "@/lib/prisma";
+import { syncPendingRunsForWorkspace } from "@/lib/run-sync";
 import { getWorkspaceId } from "@/lib/workspace";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function AgentDetailPage({ params }: Params) {
   const workspaceId = await getWorkspaceId();
+  await syncPendingRunsForWorkspace(workspaceId);
   const { id } = await params;
 
   const agent = await prisma.agent.findFirst({

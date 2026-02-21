@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_WORKSPACE_ID, ensureBootstrapData } from "@/lib/bootstrap";
+import { syncPendingRunsForWorkspace } from "@/lib/run-sync";
 
 export async function getDashboardSnapshot() {
   await ensureBootstrapData();
   const workspaceId = DEFAULT_WORKSPACE_ID;
+  await syncPendingRunsForWorkspace(workspaceId);
 
   const [agents, runs, approvals, deployments, policies, templates] = await Promise.all([
     prisma.agent.findMany({
