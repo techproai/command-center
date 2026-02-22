@@ -34,15 +34,19 @@ async function waitForServer(url, timeoutMs = 30000) {
   throw new Error(`Timed out waiting for web server at ${url}`);
 }
 
-function resolveServerEntry(appDir) {
-  const directEntry = path.join(appDir, "server.js");
-  if (fs.existsSync(directEntry)) {
-    return directEntry;
-  }
+function resolveServerEntry(searchRoots) {
+  const roots = Array.isArray(searchRoots) ? searchRoots : [searchRoots];
 
-  const nestedEntry = path.join(appDir, "web", "server.js");
-  if (fs.existsSync(nestedEntry)) {
-    return nestedEntry;
+  for (const root of roots) {
+    const directEntry = path.join(root, "server.js");
+    if (fs.existsSync(directEntry)) {
+      return directEntry;
+    }
+
+    const nestedEntry = path.join(root, "web", "server.js");
+    if (fs.existsSync(nestedEntry)) {
+      return nestedEntry;
+    }
   }
 
   throw new Error("Cannot find Next standalone server.js in packaged app directory.");
@@ -53,8 +57,13 @@ async function startBundledServer() {
     return;
   }
 
-  const appDir = path.join(process.resourcesPath, "app");
-  const serverEntry = resolveServerEntry(appDir);
+  const resourcesAppDir = path.join(process.resourcesPath, "app");
+  const bundledAppDir = path.join(__dirname, "app");
+  const serverEntry = resolveServerEntry([
+    bundledAppDir,
+    path.join(resourcesAppDir, "desktop", "app"),
+    resourcesAppDir,
+  ]);
   const serverWorkingDir = path.dirname(serverEntry);
   const dbFile = path.join(app.getPath("userData"), "command-center.db");
 
